@@ -4,7 +4,7 @@ import unicodedata
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Deque, List, Optional
+from typing import Deque, List, Optional, Union
 
 import torch
 import torchaudio
@@ -164,7 +164,7 @@ def str_to_milliseconds(s: str) -> int:
 
 
 def read_utterances_from_srt(
-    transcript_path: str, audio_path: str, normalize_unicode: bool = False
+    transcript_path: Union[str, Path], audio_path: Union[str, Path], normalize_unicode: bool = False
 ) -> List[Utterance]:
     utterances = []
     with open(transcript_path) as f:
@@ -236,7 +236,7 @@ class Record:
     prompt: str = ""
 
 
-def read_records(path: str) -> List[Record]:
+def read_records(path: Union[str, Path]) -> List[Record]:
     records = []
     with open(path) as f:
         for line in f:
@@ -251,7 +251,7 @@ def read_records(path: str) -> List[Record]:
     return records
 
 
-def write_records(records: List[Record], output: str):
+def write_records(records: List[Record], output: Union[str, Path]):
     with open(output, "w") as f:
         for record in records:
             data = {

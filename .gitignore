@@ -162,6 +162,7 @@ cython_debug/
 
 # Below are files that are specific to this project
 data/
+debug/
 output/
 dump/
 .vscode/

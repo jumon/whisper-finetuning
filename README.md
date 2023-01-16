@@ -29,6 +29,6 @@ For all available options, see `python create_data.py --help`.
 ### 2. Finetune a model
 You can finetune a model with the jsonl files generated in the previous step:
 ```
-python finetune.py --train-json <path-to-train.json> --dev-json <path-to-dev.json> --model <model-name>
+python run_finetuning.py --train-json <path-to-train.json> --dev-json <path-to-dev.json> --model <model-name>
 ```
 For all available options, see `python finetune.py --help`.
