@@ -37,7 +37,7 @@ You can transcribe audio files and calculate a metric such as WER (Word Error Ra
 ```
 python run_evaluation.py --audio <path-to-test-audio-dir> --transcript <path-to-test-transcript-dir> --output <output-dir> --language <language-of-your-data> --metric WER --model <path-to-finetuned-model>
 ```
-If you only want to transcribe audio files, you can omit the "--transcript" option and "--metric" option like this:
+If you only want to transcribe audio files, you can omit the `--transcript` option and `--metric` option like this:
 ```
 python run_evaluation.py --audio <path-to-test-audio-dir> --output <output-dir> --language <language-of-your-data> --model <path-to-finetuned-model>
 ```
