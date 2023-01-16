@@ -5,11 +5,10 @@ This makes it difficult to output timestamps along with the transcriptions.
 This repository, however, provides scripts that allow you to fine-tune a Whisper model using time-aligned data, making it possible to output timestamps with the transcriptions.
 
 ## Setup
-Install [Whisper](https://github.com/openai/whisper) and its dependencies:
 ```
-pip install git+https://github.com/openai/whisper.git
+pip install -r requirements.txt
 ```
-You may also need to install [ffmpeg](https://ffmpeg.org/) and [rust](https://www.rust-lang.org/) depending on your environment.
+You may also need to install [ffmpeg](https://ffmpeg.org/) and [rust](https://www.rust-lang.org/) to run Whisper depending on your environment.
 See the [instructions](https://github.com/openai/whisper#setup) in the Whisper repository for more details if you encounter any errors.
 
 ## Usage
@@ -32,3 +31,14 @@ You can finetune a model with the jsonl files generated in the previous step:
 python run_finetuning.py --train-json <path-to-train.json> --dev-json <path-to-dev.json> --model <model-name>
 ```
 For all available options, see `python finetune.py --help`.
+
+### 3. Evaluate the model
+You can transcribe audio files and calculate a metric such as WER (Word Error Rate) using the finetuned model:
+```
+python run_evaluation.py --audio <path-to-test-audio-dir> --transcript <path-to-test-transcript-dir> --output <output-dir> --language <language-of-your-data> --metric WER --model <path-to-finetuned-model>
+```
+If you only want to transcribe audio files, you can omit the "--transcript" option and "--metric" option like this:
+```
+python run_evaluation.py --audio <path-to-test-audio-dir> --output <output-dir> --language <language-of-your-data> --model <path-to-finetuned-model>
+```
+For all available options, see `python run_evaluation.py --help`.

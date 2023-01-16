@@ -31,7 +31,7 @@ def get_parser() -> argparse.ArgumentParser:
             "case generated transcripts will not be evaluated. When this argument is set, the "
             "filenames under this directory must match the filenames under `--audio` directory "
             "except for the extension. For example, if the transcript file is `example.srt`, there "
-            "must be an audio file like `example.wav` under `--audio` directory.",
+            "must be an audio file like `example.wav` under `--audio` directory."
         ),
     )
     parser.add_argument(
