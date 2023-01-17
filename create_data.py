@@ -144,6 +144,10 @@ def verify_args(args: argparse.Namespace):
 
 @dataclass
 class Utterance:
+    """
+    A single segment of audio with a transcription. Corresponds to a single chunk in a .srt file.
+    """
+
     audio_path: str
     text: str
     start: Optional[int] = None  # in milliseconds
@@ -185,7 +189,7 @@ def read_utterances_from_srt(
             # between [`utterance_start + 1`, `utterance_end - 2`).
             text = " ".join(
                 [line.strip() for line in lines[utterance_start + 1 : utterance_end - 2]]
-            )
+            ).strip()
             if normalize_unicode:
                 text = unicodedata.normalize("NFKC", text)
             if text == "":
@@ -230,8 +234,13 @@ def load_utterances_from_text(text_file: str, normalize_unicode: bool = False) -
 
 @dataclass
 class Record:
+    """
+    A single training instance for Whisper.
+    `text` can include timestamps in the format of <|0.00|>.
+    """
+
     audio: str
-    text: str = ""
+    text: str
     language: str = "en"
     prompt: str = ""
 
