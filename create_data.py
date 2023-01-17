@@ -288,8 +288,8 @@ class DataProcessor:
                 utterance_end = timestamps_indices[i + 1]
 
                 start_time, end_time = lines[utterance_start].strip().split(" --> ")
-                start_time = self.str_to_milliseconds(start_time)
-                end_time = self.str_to_milliseconds(end_time)
+                start_time = DataProcessor.str_to_milliseconds(start_time)
+                end_time = DataProcessor.str_to_milliseconds(end_time)
 
                 # `utterance_end - 1` corresponds to an index number of the utterance and
                 # `utterance_end - 2` corresponds to a newline character, thus the text is included
