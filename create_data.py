@@ -1,7 +1,7 @@
 import argparse
 import json
 import unicodedata
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Deque, List, Optional, Union
@@ -9,7 +9,7 @@ from typing import Deque, List, Optional, Union
 import torch
 import torchaudio
 from whisper.audio import load_audio
-from whisper.tokenizer import LANGUAGES, TO_LANGUAGE_CODE, Tokenizer, get_tokenizer
+from whisper.tokenizer import LANGUAGES, TO_LANGUAGE_CODE, get_tokenizer
 from whisper.utils import format_timestamp
 
 
@@ -22,7 +22,7 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Read SRT files and audio files to create a jsonl file with timestamps and prompts for "
-            "fine-tuning a Whisper model with time-aligned data"
+            "fine-tuning a Whisper model with time-aligned data. Defaults to True."
         ),
     )
     parser.add_argument(
@@ -38,7 +38,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.set_defaults(with_timestamps=True)
 
     parser.add_argument(
-        "--audio",
+        "--audio-dir",
         type=str,
         help=(
             "Path to directory containing audio files. This option is used only when "
@@ -46,7 +46,7 @@ def get_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--transcript",
+        "--transcript-dir",
         type=str,
         help=(
             "Path to directory containing transcripts in SRT format. This option is used only "
@@ -57,7 +57,7 @@ def get_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--data",
+        "--data-file",
         type=str,
         help=(
             "Path to a text file containing audio filenames and transcriptions. This option is "
@@ -65,14 +65,16 @@ def get_parser() -> argparse.ArgumentParser:
             "`<audio_path>\t<transcription>`."
         ),
     )
-    parser.add_argument("--output", type=str, default="data.json", help="Path to output json file")
-    parser.add_argument("--dump", type=str, default="dump", help="Directory to dump audio files")
     parser.add_argument(
         "--language",
         type=str,
         default="en",
         choices=sorted(LANGUAGES.keys()) + sorted([k.title() for k in TO_LANGUAGE_CODE.keys()]),
         help="Language of the data",
+    )
+    parser.add_argument("--output", type=str, default="data.json", help="Path to output json file")
+    parser.add_argument(
+        "--dump-dir", type=str, default="dump", help="Directory to dump audio files"
     )
     parser.add_argument(
         "--timestamp-resolution",
@@ -128,108 +130,21 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def verify_args(args: argparse.Namespace):
-    if args.with_timestamps:
-        if not args.audio or not args.transcript:
-            raise ValueError("--audio and --transcript must be set when --with-timestamps")
-
-        if args.timestamp_resolution % 20 != 0:
-            raise ValueError(
-                f"Timestamp resolution must be multiples of 20ms. Got {args.timestamp_resolution}"
-            )
-    else:
-        if not args.data:
-            raise ValueError("--data must be set when --without-timestamps")
+DURATION = 30000  # 30 seconds in milliseconds
+SAMPLE_RATE = 16000
+DURATION_IN_SAMPLES = int(DURATION * SAMPLE_RATE / 1000)
 
 
 @dataclass
 class Utterance:
     """
-    A single segment of audio with a transcription. Corresponds to a single chunk in a .srt file.
+    Representing a single segment of audio with a transcription. Corresponds to a single chunk in a
+    .srt file.
     """
 
-    audio_path: str
     text: str
     start: Optional[int] = None  # in milliseconds
     end: Optional[int] = None  # in milliseconds
-
-
-def str_to_milliseconds(s: str) -> int:
-    """
-    Convert a string in the format of "00:00:00,000" to milliseconds.
-    """
-    time, miliseconds = s.split(",")
-    hours, minutes, seconds = time.split(":")
-    hours = int(hours)
-    minutes = int(minutes)
-    seconds = int(seconds)
-    miliseconds = int(miliseconds)
-    return (hours * 3600 + minutes * 60 + seconds) * 1000 + miliseconds
-
-
-def read_utterances_from_srt(
-    transcript_path: Union[str, Path], audio_path: Union[str, Path], normalize_unicode: bool = False
-) -> List[Utterance]:
-    utterances = []
-    with open(transcript_path) as f:
-        lines = f.readlines()
-        timestamps_indices = [i for i, line in enumerate(lines) if " --> " in line]
-        timestamps_indices.append(len(lines) + 1)  # a dummy index to make the loop below simpler
-
-        for i in range(len(timestamps_indices) - 1):
-            utterance_start = timestamps_indices[i]
-            utterance_end = timestamps_indices[i + 1]
-
-            start_time, end_time = lines[utterance_start].strip().split(" --> ")
-            start_time = str_to_milliseconds(start_time)
-            end_time = str_to_milliseconds(end_time)
-
-            # `utterance_end - 1` corresponds to an index number of the utterance and
-            # `utterance_end - 2` corresponds to a newline character, thus the text is included
-            # between [`utterance_start + 1`, `utterance_end - 2`).
-            text = " ".join(
-                [line.strip() for line in lines[utterance_start + 1 : utterance_end - 2]]
-            ).strip()
-            if normalize_unicode:
-                text = unicodedata.normalize("NFKC", text)
-            if text == "":
-                # With time-aligned data, empty utterances will be created from timestamps later
-                # and are not necessary in the first place
-                continue
-
-            utterances.append(
-                Utterance(audio_path=audio_path, text=text, start=start_time, end=end_time)
-            )
-
-    return utterances
-
-
-def load_utterances_from_audio_and_transcription_dirs(
-    audio_dir: str, transcript_dir: str, normalize_unicode: bool = False
-) -> List[Utterance]:
-    utterances = []
-    for audio_path in Path(audio_dir).iterdir():
-        speech_id = Path(audio_path).stem
-        transcript_path = Path(transcript_dir) / f"{speech_id}.srt"
-        if not transcript_path.exists():
-            raise FileNotFoundError(f"Transcript file not found: {transcript_path}")
-
-        utterances_for_speech = read_utterances_from_srt(
-            transcript_path, audio_path, normalize_unicode
-        )
-        utterances.extend(utterances_for_speech)
-    return utterances
-
-
-def load_utterances_from_text(text_file: str, normalize_unicode: bool = False) -> List[Utterance]:
-    utterances = []
-    with open(text_file) as f:
-        for line in f:
-            audio_path, text = line.strip().split("\t")
-            if normalize_unicode:
-                text = unicodedata.normalize("NFKC", text)
-            utterances.append(Utterance(audio_path=audio_path, text=text))
-    return utterances
 
 
 @dataclass
@@ -239,67 +154,10 @@ class Record:
     `text` can include timestamps in the format of <|0.00|>.
     """
 
-    audio: str
+    audio_path: str
     text: str
     language: str = "en"
     prompt: str = ""
-
-
-def read_records(path: Union[str, Path]) -> List[Record]:
-    records = []
-    with open(path) as f:
-        for line in f:
-            data = json.loads(line)
-            record = Record(
-                audio=data["audio"],
-                text=data["text"],
-                language=data["language"],
-                prompt=data["prompt"],
-            )
-            records.append(record)
-    return records
-
-
-def write_records(records: List[Record], output: Union[str, Path]):
-    with open(output, "w") as f:
-        for record in records:
-            data = {
-                "audio": record.audio,
-                "text": record.text,
-                "language": record.language,
-                "prompt": record.prompt,
-            }
-            f.write(json.dumps(data, ensure_ascii=False) + "\n")
-
-
-DURATION = 30000  # 30 seconds in milliseconds
-SAMPLE_RATE = 16000
-DURATION_IN_SAMPLES = int(DURATION * SAMPLE_RATE / 1000)
-
-
-def get_time_token(time: int, segment_start: int, timestamp_resolution: int = 20) -> str:
-    """
-    Get the time token for the given time.
-
-    Args:
-        time: Time in milliseconds
-        segment_start: Start time of the segment in milliseconds
-        timestamp_resolution: Timestamp resolution in milliseconds. Defaults to 20ms.
-
-    Returns:
-        Time token (e.g. get_time_token(1200, 1000) -> "<|0.20|>")
-    """
-    if time < segment_start or segment_start + DURATION < time:
-        raise ValueError(
-            f"Time {time} is out of the segment ({segment_start} - {segment_start + DURATION})"
-        )
-
-    time_in_segment = time - segment_start
-    nearest_timestamp = (
-        round(time_in_segment / timestamp_resolution) * timestamp_resolution
-    )  # in milliseconds
-    time_token = f"<|{nearest_timestamp / 1000:.2f}|>"
-    return time_token
 
 
 @dataclass
@@ -308,191 +166,339 @@ class PromptBufferNode:
     num_tokens: int
 
 
-def get_prompt(prompt_buffer: Deque[PromptBufferNode], max_prompt_length: int) -> str:
-    prompt_length = 0
-    prompt_buffer_idx = len(prompt_buffer)
-    while prompt_buffer_idx >= 1 and prompt_length < max_prompt_length:
-        prompt_buffer_idx -= 1
-        prompt_length += prompt_buffer[prompt_buffer_idx].num_tokens
+class DataProcessor:
+    def __init__(
+        self,
+        with_timestamps: bool = True,
+        audio_dir: str = None,
+        transcript_dir: str = None,
+        data_file: str = None,
+        language: str = "en",
+        output: str = "data.json",
+        dump_dir: str = "dump",
+        timestamp_resolution: int = 20,
+        max_prompt_length: int = 223,
+        max_tokens_length: int = 219,
+        subsampling_factor_for_silence: int = 1,
+        tokenizer_type: str = "multilingual",
+        normalize_unicode: bool = False,
+    ) -> None:
+        self.with_timestamps = with_timestamps
+        self.audio_dir = audio_dir
+        self.transcript_dir = transcript_dir
+        self.data_file = data_file
+        self.language = language
+        self.output = output
+        self.dump_dir = dump_dir
+        self.timestamp_resolution = timestamp_resolution
+        self.max_prompt_length = max_prompt_length
+        self.max_tokens_length = max_tokens_length
+        self.subsampling_factor_for_silence = subsampling_factor_for_silence
+        self.tokenizer_type = tokenizer_type
+        self.normalize_unicode = normalize_unicode
 
-    for _ in range(prompt_buffer_idx):
-        prompt_buffer.popleft()
+        self._verify_args()
 
-    return " ".join([node.text for node in prompt_buffer])
+        self.tokenizer = get_tokenizer(multilingual=(self.tokenizer_type == "multilingual"))
+        Path(self.dump_dir).mkdir(parents=True, exist_ok=True)
 
+    def _verify_args(self) -> None:
+        if self.with_timestamps:
+            if not self.audio_dir or not self.transcript_dir:
+                raise ValueError(
+                    "`audio_dir` and `transcript_dir` must be set when `with_timestamps` is True"
+                )
 
-def create_records_with_timestamps_for_audio(
-    utterances: List[Utterance],
-    dump_dir: str,
-    language: str,
-    tokenizer: Tokenizer,
-    max_prompt_length: int = 223,
-    max_tokens_length: int = 219,
-    timestamp_resolution: int = 20,
-) -> List[Record]:
-    Path(dump_dir).mkdir(parents=True, exist_ok=True)
-    audio_path = utterances[0].audio_path
-    audio = torch.tensor(load_audio(audio_path))
-    records = []
-    segment_start, segment_end = 0, DURATION  # in milliseconds
-    prompt_buffer: Deque[PromptBufferNode] = deque()
+            if self.timestamp_resolution % 20 != 0:
+                raise ValueError(
+                    "`timestamps_resolution` must be multiples of 20ms. "
+                    f"Got {self.timestamp_resolution}"
+                )
+        else:
+            if not self.data_file:
+                raise ValueError("`data_file` must be set when `with_timestamps` is False")
 
-    idx = 0
-    while idx < len(utterances):
-        # If the utterance is included in the segment and longer than the segment, skip it.
-        if (
-            utterances[idx].start < segment_end
-            and utterances[idx].start + DURATION < utterances[idx].end
-        ):
-            segment_start = utterances[idx].end
+        if self.language not in LANGUAGES:
+            if self.language in TO_LANGUAGE_CODE:
+                self.language = TO_LANGUAGE_CODE[self.language]
+            else:
+                raise ValueError(f"Unsupported language: {self.language}")
+
+        if self.tokenizer_type not in ["multilingual", "english"]:
+            raise ValueError(f"Unsupported tokenizer type: {self.tokenizer_type}")
+
+        if Path(self.output).exists():
+            raise ValueError(f"Output file {self.output} already exists")
+
+    def run(self) -> None:
+        if self.with_timestamps:
+            self._process_with_timestamps()
+        else:
+            self._process_without_timestamps()
+
+        if self.subsampling_factor_for_silence > 1:
+            self._subsample_silence()
+
+    def _process_without_timestamps(self) -> None:
+        records = []
+        with open(self.data_file) as f:
+            for line in f:
+                audio_path, text = line.strip().split("\t")
+                if self.normalize_unicode:
+                    text = unicodedata.normalize("NFKC", text)
+
+                tokens = self.tokenizer.encode(text)
+                if len(tokens) > self.max_tokens_length:
+                    print(
+                        f"Skipping {audio_path} ({text}) because it is too long "
+                        f"({len(tokens)} tokens)"
+                    )
+                    continue
+
+                record = Record(audio_path=audio_path, text=text, language=self.language)
+                records.append(record)
+
+        self.write_records(records, self.output)
+
+    def _process_with_timestamps(self) -> None:
+        for audio_path in Path(self.audio_dir).iterdir():
+            speech_id = Path(audio_path).stem
+            transcript_path = Path(self.transcript_dir) / f"{speech_id}.srt"
+            if not transcript_path.exists():
+                raise FileNotFoundError(f"Transcript file not found: {transcript_path}")
+
+            utterances_for_speech = self.read_utterances_from_srt(
+                transcript_path, self.normalize_unicode
+            )
+            records = self._create_records_with_timestamps(utterances_for_speech, audio_path)
+            self.write_records(records, self.output)
+
+    @staticmethod
+    def read_utterances_from_srt(
+        transcript_path: Union[str, Path], normalize_unicode: bool = False
+    ) -> List[Utterance]:
+        utterances = []
+        with open(transcript_path) as f:
+            lines = f.readlines()
+            timestamps_indices = [i for i, line in enumerate(lines) if " --> " in line]
+            timestamps_indices.append(len(lines) + 1)  # a dummy index to make the loop below simple
+
+            for i in range(len(timestamps_indices) - 1):
+                utterance_start = timestamps_indices[i]
+                utterance_end = timestamps_indices[i + 1]
+
+                start_time, end_time = lines[utterance_start].strip().split(" --> ")
+                start_time = self.str_to_milliseconds(start_time)
+                end_time = self.str_to_milliseconds(end_time)
+
+                # `utterance_end - 1` corresponds to an index number of the utterance and
+                # `utterance_end - 2` corresponds to a newline character, thus the text is included
+                # between [`utterance_start + 1`, `utterance_end - 2`).
+                text = " ".join(
+                    [line.strip() for line in lines[utterance_start + 1 : utterance_end - 2]]
+                ).strip()
+                if normalize_unicode:
+                    text = unicodedata.normalize("NFKC", text)
+                if text == "":
+                    # With time-aligned data, empty utterances will be created from timestamps later
+                    # and are not necessary in the first place
+                    continue
+
+                utterances.append(Utterance(text=text, start=start_time, end=end_time))
+
+        return utterances
+
+    def _create_records_with_timestamps(
+        self, utterances: List[Utterance], audio_path: Path
+    ) -> List[Record]:
+        audio = torch.tensor(load_audio(audio_path))
+        dump_dir = Path(self.dump_dir) / audio_path.stem
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        records = []
+        prompt_buffer: Deque[PromptBufferNode] = deque()
+        segment_start, segment_end = 0, DURATION  # in milliseconds
+
+        idx = 0
+        while idx < len(utterances):
+            # If the utterance is included in the segment and longer than the segment, skip it.
+            if (
+                utterances[idx].start < segment_end
+                and utterances[idx].start + DURATION < utterances[idx].end
+            ):
+                segment_start = utterances[idx].end
+                segment_end = segment_start + DURATION
+                idx += 1
+                continue
+
+            segment_audio_path = self._save_segment_audio(audio, segment_start, dump_dir)
+            prompt = self._get_prompt(prompt_buffer)
+
+            segment_utterances = []
+            while idx < len(utterances) and utterances[idx].start < segment_end:
+                segment_utterances.append(utterances[idx])
+                idx += 1
+
+            tokens_length = 0
+            segment_text = []
+            for utterance in segment_utterances:
+                start_token = self._get_time_token(utterance.start, segment_start)
+                if utterance.end <= segment_end:
+                    end_token = self._get_time_token(utterance.end, segment_start)
+                    segment_text.extend([start_token, utterance.text, end_token])
+                    prompt_buffer.append(
+                        PromptBufferNode(
+                            utterance.text, len(self.tokenizer.encode(" " + utterance.text))
+                        )
+                    )
+                    tokens_length += len(self.tokenizer.encode(utterance.text)) + 2
+                else:
+                    segment_text.append(start_token)
+                    tokens_length += 1
+
+            if tokens_length > self.max_tokens_length:
+                print(
+                    f"Skipping {audio_path} ({format_timestamp(segment_start / 1000)}-"
+                    f"{format_timestamp(segment_end / 1000)}) because it is too long "
+                    f"({tokens_length} tokens)"
+                )
+            else:
+                record = Record(
+                    audio_path=segment_audio_path,
+                    language=self.language,
+                    text="".join(segment_text),
+                    prompt=prompt,
+                )
+                records.append(record)
+
+            if len(segment_utterances) == 0:
+                segment_start += DURATION
+            elif segment_utterances[-1].end <= segment_end:
+                segment_start = segment_utterances[-1].end
+            else:  # segment_utterances[-1].end > segment_end
+                # The text of the last utterance was not included in the segment and will be
+                # included in the next segment
+                segment_start = segment_utterances[-1].start
+                idx -= 1
             segment_end = segment_start + DURATION
-            idx += 1
-            continue
 
+        return records
+
+    def _save_segment_audio(self, audio: torch.Tensor, segment_start: int, dump_dir: Path) -> str:
         audio_start_idx = int(segment_start * SAMPLE_RATE / 1000)
-        segment_audio_path = str((Path(dump_dir) / f"{segment_start}.wav").absolute())
+        segment_audio_path = str((dump_dir / f"{segment_start}.wav").absolute())
         segment_audio = audio[
             audio_start_idx : min(audio_start_idx + DURATION_IN_SAMPLES, audio.size(0))
         ]
         torchaudio.save(segment_audio_path, segment_audio.unsqueeze(0), SAMPLE_RATE)
+        return segment_audio_path
 
-        prompt = get_prompt(prompt_buffer, max_prompt_length)
+    @staticmethod
+    def str_to_milliseconds(s: str) -> int:
+        """
+        Convert a string in the format of "00:00:00,000" to milliseconds.
+        """
+        time, miliseconds = s.split(",")
+        hours, minutes, seconds = time.split(":")
+        hours = int(hours)
+        minutes = int(minutes)
+        seconds = int(seconds)
+        miliseconds = int(miliseconds)
+        return (hours * 3600 + minutes * 60 + seconds) * 1000 + miliseconds
 
-        segment_utterances = []
-        while idx < len(utterances) and utterances[idx].start < segment_end:
-            segment_utterances.append(utterances[idx])
-            idx += 1
+    def _get_time_token(self, time: int, segment_start: int) -> str:
+        """
+        Get the time token for the given time.
 
-        tokens_length = 0
-        segment_text = []
-        for utterance in segment_utterances:
-            start_token = get_time_token(utterance.start, segment_start, timestamp_resolution)
-            if utterance.end <= segment_end:
-                end_token = get_time_token(utterance.end, segment_start, timestamp_resolution)
-                segment_text.extend([start_token, utterance.text, end_token])
-                prompt_buffer.append(
-                    PromptBufferNode(utterance.text, len(tokenizer.encode(" " + utterance.text)))
+        Args:
+            time: Time in milliseconds
+            segment_start: Start time of the segment in milliseconds
+
+        Returns:
+            Time token (e.g. self._get_time_token(1200, 1000) -> "<|0.20|>")
+        """
+        if time < segment_start or segment_start + DURATION < time:
+            raise ValueError(
+                f"Time {time} is out of the segment ({segment_start} - {segment_start + DURATION})"
+            )
+
+        time_in_segment = time - segment_start
+        nearest_timestamp = (
+            round(time_in_segment / self.timestamp_resolution) * self.timestamp_resolution
+        )  # in milliseconds
+        time_token = f"<|{nearest_timestamp / 1000:.2f}|>"
+        return time_token
+
+    def _get_prompt(self, prompt_buffer: Deque[PromptBufferNode]) -> str:
+        prompt_length = 0
+        prompt_buffer_idx = len(prompt_buffer)
+        while prompt_buffer_idx >= 1 and prompt_length < self.max_prompt_length:
+            prompt_buffer_idx -= 1
+            prompt_length += prompt_buffer[prompt_buffer_idx].num_tokens
+
+        for _ in range(prompt_buffer_idx):
+            prompt_buffer.popleft()
+
+        return " ".join([node.text for node in prompt_buffer])
+
+    @staticmethod
+    def read_records(path: Union[str, Path]) -> List[Record]:
+        records = []
+        with open(path) as f:
+            for line in f:
+                data = json.loads(line)
+                record = Record(
+                    audio_path=data["audio_path"],
+                    text=data["text"],
+                    language=data["language"],
+                    prompt=data["prompt"],
                 )
-                tokens_length += len(tokenizer.encode(utterance.text)) + 2
-            else:
-                segment_text.append(start_token)
-                tokens_length += 1
-
-        if tokens_length > max_tokens_length:
-            print(
-                f"Skipping {audio_path} ({format_timestamp(segment_start / 1000)}-"
-                f"{format_timestamp(segment_end / 1000)}) because it is too long "
-                f"({tokens_length} tokens)"
-            )
-        else:
-            record = Record(
-                audio=segment_audio_path,
-                language=language,
-                text="".join(segment_text),
-                prompt=prompt,
-            )
-            records.append(record)
-
-        if len(segment_utterances) == 0:
-            segment_start += DURATION
-        elif segment_utterances[-1].end <= segment_end:
-            segment_start = segment_utterances[-1].end
-        else:  # segment_utterances[-1].end > segment_end
-            # The text of the last utterance was not included in the segment and will be
-            # included in the next segment
-            segment_start = segment_utterances[-1].start
-            idx -= 1
-        segment_end = segment_start + DURATION
-
-    return records
-
-
-def create_records_with_timestamps(
-    utterances: List[Utterance],
-    dump_dir: str,
-    language: str,
-    tokenizer: Tokenizer,
-    max_prompt_length: int = 223,
-    max_tokens_length: int = 219,
-    timestamp_resolution: int = 20,
-) -> List[Record]:
-    utterances_grouped_by_audio = defaultdict(list)
-    for utterance in utterances:
-        utterances_grouped_by_audio[utterance.audio_path].append(utterance)
-
-    all_records = []
-    for audio_path, utterances_for_audio in utterances_grouped_by_audio.items():
-        records = create_records_with_timestamps_for_audio(
-            utterances=utterances_for_audio,
-            dump_dir=f"{dump_dir}/{Path(audio_path).stem}",
-            language=language,
-            tokenizer=tokenizer,
-            max_prompt_length=max_prompt_length,
-            max_tokens_length=max_tokens_length,
-            timestamp_resolution=timestamp_resolution,
-        )
-        all_records.extend(records)
-
-    return all_records
-
-
-def create_records_without_timestamps(
-    utterances: List[Utterance], language: str, tokenizer: Tokenizer, max_tokens_length: int
-) -> List[Record]:
-    records = []
-    for utterance in utterances:
-        tokens = tokenizer.encode(utterance.text)
-        if len(tokens) > max_tokens_length:
-            print(f"Skipping {utterance} because it is too long ({len(tokens)} tokens)")
-            continue
-
-        records.append(Record(utterance.audio_path, text=utterance.text, language=language))
-
-    return records
-
-
-def subsample_silence(records: List[Record], subsampling_factor: int) -> List[Record]:
-    if subsampling_factor == 1:
+                records.append(record)
         return records
 
-    silence_records = filter(lambda record: record.text == "", records)
-    non_silence_records = filter(lambda record: record.text != "", records)
-    return list(non_silence_records) + list(silence_records)[::subsampling_factor]
+    @staticmethod
+    def write_records(records: List[Record], path: Union[str, Path]) -> None:
+        with open(path, "a") as f:
+            for record in records:
+                data = {
+                    "audio_path": record.audio_path,
+                    "text": record.text,
+                    "language": record.language,
+                    "prompt": record.prompt,
+                }
+                f.write(json.dumps(data, ensure_ascii=False) + "\n")
+
+    def _subsample_silence(self) -> None:
+        records = self.read_records(self.output)
+
+        silence_records = filter(lambda record: record.text == "", records)
+        non_silence_records = filter(lambda record: record.text != "", records)
+        filtered_records = (
+            list(non_silence_records)
+            + list(silence_records)[:: self.subsampling_factor_for_silence]
+        )
+
+        Path(self.output).unlink()
+        self.write_records(filtered_records, self.output)
 
 
 def main():
     args = get_parser().parse_args()
-    verify_args(args)
-
-    tokenizer = get_tokenizer(multilingual=(args.tokenizer_type == "multilingual"))
-    Path(args.dump).mkdir(parents=True, exist_ok=True)
-
-    if args.with_timestamps:
-        utterances = load_utterances_from_audio_and_transcription_dirs(
-            args.audio,
-            args.transcript,
-            args.normalize_unicode,
-        )
-        records = create_records_with_timestamps(
-            utterances=utterances,
-            dump_dir=args.dump,
-            language=args.language,
-            tokenizer=tokenizer,
-            max_prompt_length=args.max_prompt_length,
-            max_tokens_length=args.max_tokens_length,
-            timestamp_resolution=args.timestamp_resolution,
-        )
-    else:
-        utterances = load_utterances_from_text(args.data, args.normalize_unicode)
-        records = create_records_without_timestamps(
-            utterances=utterances,
-            language=args.language,
-            tokenizer=tokenizer,
-            max_tokens_length=args.max_tokens_length,
-        )
-
-    records = subsample_silence(records, args.subsampling_factor_for_silence)
-    write_records(records, args.output)
+    processor = DataProcessor(
+        with_timestamps=args.with_timestamps,
+        audio_dir=args.audio_dir,
+        transcript_dir=args.transcript_dir,
+        data_file=args.data_file,
+        language=args.language,
+        output=args.output,
+        dump_dir=args.dump_dir,
+        timestamp_resolution=args.timestamp_resolution,
+        max_prompt_length=args.max_prompt_length,
+        max_tokens_length=args.max_tokens_length,
+        subsampling_factor_for_silence=args.subsampling_factor_for_silence,
+        tokenizer_type=args.tokenizer_type,
+        normalize_unicode=args.normalize_unicode,
+    )
+    processor.run()
 
 
 if __name__ == "__main__":

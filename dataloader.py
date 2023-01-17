@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 from whisper.audio import CHUNK_LENGTH, N_FRAMES, log_mel_spectrogram, pad_or_trim
 from whisper.tokenizer import Tokenizer
 
-from create_data import Record, read_records
+from create_data import DataProcessor, Record
 
 
 class AudioDataset(Dataset):
@@ -133,7 +133,7 @@ class AudioDataset(Dataset):
             + [self.tokenizer.eot]
         )
 
-        mel = self._calculate_mel(record.audio, next_partial_segment_start)
+        mel = self._calculate_mel(record.audio_path, next_partial_segment_start)
 
         return (
             mel,
@@ -161,7 +161,7 @@ def get_dataloader(
     no_timestamps_rate: float = 0.5,
     shuffle: bool = True,
 ) -> DataLoader:
-    records = read_records(json)
+    records = DataProcessor.read_records(json)
     dataset = AudioDataset(
         records,
         tokenizer,

@@ -17,11 +17,11 @@ The scripts in this repository assume that you have a directory containing audio
 The SRT files should have the same name as the audio files.
 Run the following command to generate a jsonl file that can be used as a training set for finetuning a model:
 ```
-python create_data.py --audio <path-to-training-audio-dir> --transcript <path-to-training-transcript-dir> --language <language-of-your-data>  --output train.json
+python create_data.py --audio-dir <path-to-training-audio-dir> --transcript-dir <path-to-training-transcript-dir> --language <language-of-your-data>  --output train.json
 ```
 To generate a jsonl file for validation, run the following command:
 ```
-python create_data.py --audio <path-to-dev-audio-dir> --transcript <path-to-dev-transcript-dir> --language <language-of-your-data>  --output dev.json
+python create_data.py --audio-dir <path-to-dev-audio-dir> --transcript-dir <path-to-dev-transcript-dir> --language <language-of-your-data>  --output dev.json
 ```
 For all available options, see `python create_data.py --help`.
 
@@ -30,15 +30,15 @@ You can finetune a model with the jsonl files generated in the previous step:
 ```
 python run_finetuning.py --train-json <path-to-train.json> --dev-json <path-to-dev.json> --model <model-name>
 ```
-For all available options, see `python finetune.py --help`.
+For all available options, see `python run_finetuning.py --help`.
 
 ### 3. Evaluate the model
 You can transcribe audio files and calculate a metric such as WER (Word Error Rate) using the finetuned model:
 ```
-python run_evaluation.py --audio <path-to-test-audio-dir> --transcript <path-to-test-transcript-dir> --output <output-dir> --language <language-of-your-data> --metric WER --model <path-to-finetuned-model>
+python run_evaluation.py --audio-dir <path-to-test-audio-dir> --transcript-dir <path-to-test-transcript-dir> --save-dir <output-dir> --language <language-of-your-data> --metric WER --model <path-to-finetuned-model>
 ```
-If you only want to transcribe audio files, you can omit the `--transcript` option and `--metric` option like this:
+If you only want to transcribe audio files, you can omit the `--transcript-dir` option and `--metric` option like this:
 ```
-python run_evaluation.py --audio <path-to-test-audio-dir> --output <output-dir> --language <language-of-your-data> --model <path-to-finetuned-model>
+python run_evaluation.py --audio-dir <path-to-test-audio-dir> --save-dir <output-dir> --language <language-of-your-data> --model <path-to-finetuned-model>
 ```
 For all available options, see `python run_evaluation.py --help`.

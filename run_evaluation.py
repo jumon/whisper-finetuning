@@ -9,7 +9,7 @@ from tqdm import tqdm
 from whisper.tokenizer import LANGUAGES, TO_LANGUAGE_CODE
 from whisper.utils import write_srt
 
-from create_data import read_utterances_from_srt
+from create_data import DataProcessor
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -17,25 +17,28 @@ def get_parser() -> argparse.ArgumentParser:
         description="Transcribe audio files with a Whisper model and calculate evaluation metrics"
     )
     parser.add_argument(
-        "--audio",
+        "--audio-dir",
         type=str,
         required=True,
         help="Path to directory containing audio files to transcribe",
     )
     parser.add_argument(
-        "--transcript",
+        "--transcript-dir",
         type=str,
         default=None,
         help=(
             "Path to directory containing transcripts in SRT format. Defaults to None, in which "
             "case generated transcripts will not be evaluated. When this argument is set, the "
-            "filenames under this directory must match the filenames under `--audio` directory "
+            "filenames under this directory must match the filenames under `--audio-dir` directory "
             "except for the extension. For example, if the transcript file is `example.srt`, there "
-            "must be an audio file like `example.wav` under `--audio` directory."
+            "must be an audio file like `example.wav` under `--audio-dir` directory."
         ),
     )
     parser.add_argument(
-        "--output", type=str, default="output", help="Path to directory to save transcribed results"
+        "--save-dir",
+        type=str,
+        default="output",
+        help="Path to directory to save transcribed results",
     )
     parser.add_argument(
         "--language",
@@ -75,7 +78,7 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def srt_to_text(path: Union[str, Path]) -> str:
-    utterances = read_utterances_from_srt(path, "", normalize_unicode=True)
+    utterances = DataProcessor.read_utterances_from_srt(path, normalize_unicode=True)
     return " ".join([u.text for u in utterances])
 
 
@@ -86,7 +89,7 @@ def save_srt(transcript: Iterator[dict], path: Union[str, Path]) -> None:
 
 def main():
     args = get_parser().parse_args()
-    Path(args.output).mkdir(parents=True, exist_ok=True)
+    Path(args.save_dir).mkdir(parents=True, exist_ok=True)
     model = whisper.load_model(args.model, args.device)
     do_evaluation = args.transcript is not None
 
@@ -95,17 +98,17 @@ def main():
         evaluator = evaluate.load(args.metric.lower())
         score_sum = 0
 
-    for audio_path in tqdm(list(Path(args.audio).iterdir())):
+    for audio_path in tqdm(list(Path(args.audio_dir).iterdir())):
         if args.verbose:
             tqdm.write(f"Processing: {audio_path}")
 
         speech_id = Path(audio_path).stem
         result = model.transcribe(task=args.task, audio=str(audio_path), language=args.language)
-        recognized_path = Path(args.output) / f"{speech_id}.srt"
+        recognized_path = Path(args.save_dir) / f"{speech_id}.srt"
         save_srt(result["segments"], recognized_path)
 
         if do_evaluation:
-            transcript_path = Path(args.transcript) / f"{speech_id}.srt"
+            transcript_path = Path(args.transcript_dir) / f"{speech_id}.srt"
             if not transcript_path.exists():
                 raise FileNotFoundError(f"Transcript file not found: {transcript_path}")
 
