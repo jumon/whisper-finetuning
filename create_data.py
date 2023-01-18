@@ -340,12 +340,23 @@ class DataProcessor:
                 segment_utterances.append(utterances[idx])
                 idx += 1
 
+            if not self._is_valid_utterances(segment_utterances):
+                tqdm.write(
+                    f"Skipping {audio_path} ({format_timestamp(segment_start / 1000)}-"
+                    f"{format_timestamp(segment_end / 1000)}) because it contains invalid "
+                    f"utterances: {segment_utterances}"
+                )
+                prompt_buffer.clear()
+                segment_start = max(segment_end, segment_utterances[-1].end)
+                segment_end = segment_start + DURATION
+                continue
+
             tokens_length = 0
             segment_text = []
             for utterance in segment_utterances:
-                start_token = self._get_time_token(utterance.start, segment_start)
+                start_token = self._get_time_token(utterance.start, segment_start, audio_path)
                 if utterance.end <= segment_end:
-                    end_token = self._get_time_token(utterance.end, segment_start)
+                    end_token = self._get_time_token(utterance.end, segment_start, audio_path)
                     segment_text.extend([start_token, utterance.text, end_token])
                     prompt_buffer.append(
                         PromptBufferNode(
@@ -394,6 +405,21 @@ class DataProcessor:
         torchaudio.save(segment_audio_path, segment_audio.unsqueeze(0), SAMPLE_RATE)
         return segment_audio_path
 
+    def _is_valid_utterances(self, utterances: List[Utterance]) -> bool:
+        if len(utterances) == 0:
+            return True
+
+        for i in range(len(utterances) - 1):
+            if utterances[i].start > utterances[i].end:
+                return False
+            if utterances[i].end > utterances[i + 1].start:
+                return False
+
+        if utterances[-1].start > utterances[-1].end:
+            return False
+
+        return True
+
     @staticmethod
     def str_to_milliseconds(s: str) -> int:
         """
@@ -407,7 +433,7 @@ class DataProcessor:
         miliseconds = int(miliseconds)
         return (hours * 3600 + minutes * 60 + seconds) * 1000 + miliseconds
 
-    def _get_time_token(self, time: int, segment_start: int) -> str:
+    def _get_time_token(self, time: int, segment_start: int, audio_path: Path) -> str:
         """
         Get the time token for the given time.
 
@@ -420,7 +446,9 @@ class DataProcessor:
         """
         if time < segment_start or segment_start + DURATION < time:
             raise ValueError(
-                f"Time {time} is out of the segment ({segment_start} - {segment_start + DURATION})"
+                f"Time {format_timestamp(time / 1000)} is out of the segment "
+                f"({format_timestamp(segment_start / 1000)} - "
+                f"{format_timestamp((segment_start + DURATION) / 1000)}) of {audio_path}"
             )
 
         time_in_segment = time - segment_start
