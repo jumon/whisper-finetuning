@@ -8,6 +8,7 @@ from typing import Deque, List, Optional, Union
 
 import torch
 import torchaudio
+from tqdm import tqdm
 from whisper.audio import load_audio
 from whisper.tokenizer import LANGUAGES, TO_LANGUAGE_CODE, get_tokenizer
 from whisper.utils import format_timestamp
@@ -261,7 +262,8 @@ class DataProcessor:
         self.write_records(records, self.output)
 
     def _process_with_timestamps(self) -> None:
-        for audio_path in Path(self.audio_dir).iterdir():
+        audio_paths = list(Path(self.audio_dir).iterdir())
+        for audio_path in tqdm(audio_paths):
             speech_id = Path(audio_path).stem
             transcript_path = Path(self.transcript_dir) / f"{speech_id}.srt"
             if not transcript_path.exists():
@@ -356,7 +358,7 @@ class DataProcessor:
                     tokens_length += 1
 
             if tokens_length > self.max_tokens_length:
-                print(
+                tqdm.write(
                     f"Skipping {audio_path} ({format_timestamp(segment_start / 1000)}-"
                     f"{format_timestamp(segment_end / 1000)}) because it is too long "
                     f"({tokens_length} tokens)"
