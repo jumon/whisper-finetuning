@@ -107,7 +107,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--save-all-checkpoints",
         action="store_true",
-        help="Save all checkpoints instead of only the best one",
+        help="Save all checkpoints instead of only the best and the last one",
     )
     parser.add_argument(
         "--seed",
@@ -223,6 +223,8 @@ def main_loop(
 
             if args.save_all_checkpoints:
                 save_model(model, f"{args.save_dir}/step{step}.pt")
+
+            save_model(model, f"{args.save_dir}/last_model.pt")
 
 
 def main():
