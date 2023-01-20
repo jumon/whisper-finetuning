@@ -91,7 +91,7 @@ def main():
     args = get_parser().parse_args()
     Path(args.save_dir).mkdir(parents=True, exist_ok=True)
     model = whisper.load_model(args.model, args.device)
-    do_evaluation = args.transcript is not None
+    do_evaluation = args.transcript_dir is not None
 
     if do_evaluation:
         reference_texts, recognized_texts = [], []
