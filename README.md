@@ -1,6 +1,6 @@
 # [Work In Progress] whisper-finetuning
-This is a collection of scripts that can be used to fine-tune a Whisper model using "time-aligned" transcriptions and audio files.
-Although there are already codes available for fine-tuning a Whisper model, such as the one provided by the Hugging Face transformers library (https://huggingface.co/blog/fine-tune-whisper), they only offer a way to fine-tune a model using transcripts without timestamps.
+This is a collection of scripts that can be used to fine-tune a Whisper model using <strong>time-aligned</strong> transcriptions and audio files.
+Although there are already codes available for fine-tuning a Whisper model, such as the one provided by the Hugging Face transformers library (https://huggingface.co/blog/fine-tune-whisper), they only offer a way to fine-tune a model using transcripts <strong>without timestamps</strong>.
 This makes it difficult to output timestamps along with the transcriptions.
 This repository, however, provides scripts that allow you to fine-tune a Whisper model using time-aligned data, making it possible to output timestamps with the transcriptions.
 
@@ -32,13 +32,16 @@ python run_finetuning.py --train-json <path-to-train.json> --dev-json <path-to-d
 ```
 For all available options, see `python run_finetuning.py --help`.
 
-### 3. Evaluate the model
-You can transcribe audio files and calculate a metric such as WER (Word Error Rate) using the finetuned model:
+### 3. Transcribe audio files
+You can transcribe audio files using the finetuned model by running the command:
 ```
-python run_evaluation.py --audio-dir <path-to-test-audio-dir> --transcript-dir <path-to-test-transcript-dir> --save-dir <output-dir> --language <language-of-your-data> --metric WER --model <path-to-finetuned-model>
+python transcribe.py --audio-dir <path-to-audio-dir-to-transcribe> --save-dir <output-dir> --language <language-of-your-data> --model <path-to-finetuned-model>
 ```
-If you only want to transcribe audio files, you can omit the `--transcript-dir` option and `--metric` option like this:
+Alternatively, you can use the original [whisper command](https://github.com/openai/whisper#command-line-usage) with the `--model <path-to-finetuned-model>` option to transcribe audio files using the finetuned model.
+
+### 4. Calculate a metric
+To calculate a metric such as Word Error Rate (WER), use the transcripts generated in the previous step along with the ground truth transcripts by running the command:
 ```
-python run_evaluation.py --audio-dir <path-to-test-audio-dir> --save-dir <output-dir> --language <language-of-your-data> --model <path-to-finetuned-model>
+python calculate_metric.py --recognized-dir <path-to-recognized-transcript-dir> --transcript-dir <path-to-ground-truth-transcript-dir> --metric WER
 ```
-For all available options, see `python run_evaluation.py --help`.
+For all available options, see `python calculate_metric.py --help`.
