@@ -1,10 +1,9 @@
 import argparse
 from pathlib import Path
-from typing import Iterator, Union
+from typing import Union
 
 import evaluate
 from tqdm import tqdm
-from whisper.utils import write_srt
 
 from create_data import DataProcessor
 
@@ -42,11 +41,6 @@ def get_parser() -> argparse.ArgumentParser:
 def srt_to_text(path: Union[str, Path], utterance_separator: str = " ") -> str:
     utterances = DataProcessor.read_utterances_from_srt(path, normalize_unicode=True)
     return utterance_separator.join([u.text for u in utterances])
-
-
-def save_srt(transcript: Iterator[dict], path: Union[str, Path]) -> None:
-    with open(path, "w") as f:
-        write_srt(transcript, file=f)
 
 
 def main():

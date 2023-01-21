@@ -8,8 +8,6 @@ from tqdm import tqdm
 from whisper.tokenizer import LANGUAGES, TO_LANGUAGE_CODE
 from whisper.utils import write_srt
 
-from create_data import DataProcessor
-
 
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Transcribe audio files with a Whisper model")
@@ -52,11 +50,6 @@ def get_parser() -> argparse.ArgumentParser:
         ),
     )
     return parser
-
-
-def srt_to_text(path: Union[str, Path]) -> str:
-    utterances = DataProcessor.read_utterances_from_srt(path, normalize_unicode=True)
-    return " ".join([u.text for u in utterances])
 
 
 def save_srt(transcript: Iterator[dict], path: Union[str, Path]) -> None:
