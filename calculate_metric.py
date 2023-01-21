@@ -39,9 +39,9 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def srt_to_text(path: Union[str, Path]) -> str:
+def srt_to_text(path: Union[str, Path], utterance_separator: str = " ") -> str:
     utterances = DataProcessor.read_utterances_from_srt(path, normalize_unicode=True)
-    return " ".join([u.text for u in utterances])
+    return utterance_separator.join([u.text for u in utterances])
 
 
 def save_srt(transcript: Iterator[dict], path: Union[str, Path]) -> None:
@@ -55,6 +55,7 @@ def main():
     reference_texts, recognized_texts = [], []
     evaluator = evaluate.load(args.metric.lower())
     score_sum = 0
+    utterance_separator = " " if args.metric == "WER" else ""
 
     for recognized_path in tqdm(list(Path(args.recognized_dir).iterdir())):
         speech_id = Path(recognized_path).stem
@@ -62,8 +63,8 @@ def main():
         if not transcript_path.exists():
             raise FileNotFoundError(f"Transcript file not found: {transcript_path}")
 
-        reference_text = srt_to_text(transcript_path)
-        recognized_text = srt_to_text(recognized_path)
+        reference_text = srt_to_text(transcript_path, utterance_separator=utterance_separator)
+        recognized_text = srt_to_text(recognized_path, utterance_separator=utterance_separator)
         reference_texts.append(reference_text)
         recognized_texts.append(recognized_text)
 
