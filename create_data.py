@@ -156,14 +156,14 @@ class Record:
     """
 
     audio_path: str
-    text: str
+    text: str  # text including timestamps
     language: str = "en"
-    prompt: str = ""
+    prompt: str = ""  # previous text including timestamps
 
 
 @dataclass
-class PromptBufferNode:
-    text: str
+class PromptNode:
+    text: str  # text including timestamps
     num_tokens: int
 
 
@@ -317,7 +317,7 @@ class DataProcessor:
         dump_dir = Path(self.dump_dir) / audio_path.stem
         dump_dir.mkdir(parents=True, exist_ok=True)
         records = []
-        prompt_buffer: Deque[PromptBufferNode] = deque()
+        prompt_buffer: Deque[PromptNode] = deque()
         segment_start, segment_end = 0, DURATION  # in milliseconds
 
         idx = 0
@@ -357,16 +357,19 @@ class DataProcessor:
                 start_token = self._get_time_token(utterance.start, segment_start, audio_path)
                 if utterance.end <= segment_end:
                     end_token = self._get_time_token(utterance.end, segment_start, audio_path)
-                    segment_text.extend([start_token, utterance.text, end_token])
-                    prompt_buffer.append(
-                        PromptBufferNode(
-                            utterance.text, len(self.tokenizer.encode(" " + utterance.text))
-                        )
+                    utterance_text = self._add_leading_space(utterance.text)
+                    segment_text.extend([start_token, utterance_text, end_token])
+                    new_prompt_length = len(self.tokenizer.encode(utterance_text)) + 2
+                    new_prompt_node = PromptNode(
+                        start_token + utterance_text + end_token, new_prompt_length
                     )
-                    tokens_length += len(self.tokenizer.encode(utterance.text)) + 2
+                    tokens_length += new_prompt_length
                 else:
                     segment_text.append(start_token)
+                    new_prompt_node = PromptNode(start_token, 1)
                     tokens_length += 1
+
+                prompt_buffer.append(new_prompt_node)
 
             if tokens_length > self.max_tokens_length:
                 tqdm.write(
@@ -420,6 +423,17 @@ class DataProcessor:
 
         return True
 
+    def _add_leading_space(self, text: str) -> str:
+        """
+        Add a leading space to the text if the language uses spaces to separate words.
+        For languages that do not use spaces, namely Chinese, Japanese, Thai, Lao, and
+        Burmese, return the text as is.
+        """
+        if self.language in ["zh", "ja", "th", "lo", "my"]:
+            return text
+        else:
+            return " " + text
+
     @staticmethod
     def str_to_milliseconds(s: str) -> int:
         """
@@ -458,7 +472,7 @@ class DataProcessor:
         time_token = f"<|{nearest_timestamp / 1000:.2f}|>"
         return time_token
 
-    def _get_prompt(self, prompt_buffer: Deque[PromptBufferNode]) -> str:
+    def _get_prompt(self, prompt_buffer: Deque[PromptNode]) -> str:
         prompt_length = 0
         prompt_buffer_idx = len(prompt_buffer)
         while prompt_buffer_idx >= 1 and prompt_length < self.max_prompt_length:
@@ -468,7 +482,7 @@ class DataProcessor:
         for _ in range(prompt_buffer_idx):
             prompt_buffer.popleft()
 
-        return " ".join([node.text for node in prompt_buffer])
+        return "".join([node.text for node in prompt_buffer])
 
     @staticmethod
     def read_records(path: Union[str, Path]) -> List[Record]:
