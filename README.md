@@ -13,8 +13,8 @@ See the [instructions](https://github.com/openai/whisper#setup) in the Whisper r
 
 ## Usage
 ### 1. Prepare your data
-The scripts in this repository assume that you have a directory containing audio files and a corresponding directory containing transcripts in SRT format.
-The SRT files should have the same name as the audio files.
+The scripts in this repository assume that you have a directory containing audio files and a corresponding directory containing transcripts in SRT (or VTT) format.
+The SRT (or VTT) files should have the same name as the audio files.
 Run the following command to generate a jsonl file that can be used as a training set for finetuning a model:
 ```
 python create_data.py --audio-dir <path-to-training-audio-dir> --transcript-dir <path-to-training-transcript-dir> --language <language-of-your-data>  --output train.json
