@@ -22,8 +22,8 @@ def get_parser() -> argparse.ArgumentParser:
         "--with-timestamps",
         action="store_true",
         help=(
-            "Read SRT files and audio files to create a jsonl file with timestamps and prompts for "
-            "fine-tuning a Whisper model with time-aligned data. Defaults to True."
+            "Read SRT (or VTT) files and audio files to create a jsonl file with timestamps and "
+            "prompts for fine-tuning a Whisper model with time-aligned data. Defaults to True."
         ),
     )
     parser.add_argument(
@@ -50,9 +50,9 @@ def get_parser() -> argparse.ArgumentParser:
         "--transcript-dir",
         type=str,
         help=(
-            "Path to directory containing transcripts in SRT format. This option is used only "
-            "when `--with-timestamps` is set. Filenames must match the filenames under `--audio` "
-            "directory except for the extension. For example, if the transcript file is "
+            "Path to directory containing transcripts in SRT (or VTT) format. This option is used "
+            "only when `--with-timestamps` is set. Filenames must match the filenames under "
+            "`--audio` directory except for the extension. For example, if the transcript file is "
             "`example.srt`, there must be an audio file like `example.wav` under `--audio` "
             "directory.",
         ),
@@ -140,7 +140,7 @@ DURATION_IN_SAMPLES = int(DURATION * SAMPLE_RATE / 1000)
 class Utterance:
     """
     Representing a single segment of audio with a transcription. Corresponds to a single chunk in a
-    .srt file.
+    .srt (or .vtt) file.
     """
 
     text: str
@@ -265,13 +265,17 @@ class DataProcessor:
         audio_paths = list(Path(self.audio_dir).iterdir())
         for audio_path in tqdm(audio_paths):
             speech_id = Path(audio_path).stem
-            transcript_path = Path(self.transcript_dir) / f"{speech_id}.srt"
-            if not transcript_path.exists():
-                raise FileNotFoundError(f"Transcript file not found: {transcript_path}")
+            if (Path(self.transcript_dir) / f"{speech_id}.srt").exists():
+                utterances_for_speech = self.read_utterances_from_srt(
+                    Path(self.transcript_dir) / f"{speech_id}.srt", self.normalize_unicode
+                )
+            elif (Path(self.transcript_dir) / f"{speech_id}.vtt").exists():
+                utterances_for_speech = self.read_utterances_from_vtt(
+                    Path(self.transcript_dir) / f"{speech_id}.vtt", self.normalize_unicode
+                )
+            else:
+                raise FileNotFoundError(f"Transcript file not found for {speech_id}")
 
-            utterances_for_speech = self.read_utterances_from_srt(
-                transcript_path, self.normalize_unicode
-            )
             records = self._create_records_with_timestamps(utterances_for_speech, audio_path)
             self.write_records(records, self.output)
 
@@ -287,17 +291,51 @@ class DataProcessor:
 
             for i in range(len(timestamps_indices) - 1):
                 utterance_start = timestamps_indices[i]
-                utterance_end = timestamps_indices[i + 1]
+                next_utterance_start = timestamps_indices[i + 1]
 
                 start_time, end_time = lines[utterance_start].strip().split(" --> ")
                 start_time = DataProcessor.str_to_milliseconds(start_time)
                 end_time = DataProcessor.str_to_milliseconds(end_time)
 
-                # `utterance_end - 1` corresponds to an index number of the utterance and
-                # `utterance_end - 2` corresponds to a newline character, thus the text is included
-                # between [`utterance_start + 1`, `utterance_end - 2`).
+                # `next_utterance_start - 1` corresponds to an index number of the utterance and
+                # `next_utterance_start - 2` corresponds to a newline character, thus the text is included
+                # between [`utterance_start + 1`, `next_utterance_start - 2`).
                 text = " ".join(
-                    [line.strip() for line in lines[utterance_start + 1 : utterance_end - 2]]
+                    [line.strip() for line in lines[utterance_start + 1 : next_utterance_start - 2]]
+                ).strip()
+                if normalize_unicode:
+                    text = unicodedata.normalize("NFKC", text)
+                if text == "":
+                    # With time-aligned data, empty utterances will be created from timestamps later
+                    # and are not necessary in the first place
+                    continue
+
+                utterances.append(Utterance(text=text, start=start_time, end=end_time))
+
+        return utterances
+
+    @staticmethod
+    def read_utterances_from_vtt(
+        transcript_path: Union[str, Path], normalize_unicode: bool = False
+    ) -> List[Utterance]:
+        utterances = []
+        with open(transcript_path) as f:
+            lines = f.readlines()
+            timestamps_indices = [i for i, line in enumerate(lines) if " --> " in line]
+            timestamps_indices.append(len(lines) + 1)  # a dummy index to make the loop below simple
+
+            for i in range(len(timestamps_indices) - 1):
+                utterance_start = timestamps_indices[i]
+                next_utterance_start = timestamps_indices[i + 1]
+
+                start_time, end_time = lines[utterance_start].strip().split(" --> ")
+                start_time = DataProcessor.str_to_milliseconds(start_time)
+                end_time = DataProcessor.str_to_milliseconds(end_time)
+
+                # `next_utterance_start - 1` corresponds to a newline, thus the text is included
+                # between [`utterance_start + 1`, `next_utterance_start - 1`).
+                text = " ".join(
+                    [line.strip() for line in lines[utterance_start + 1 : next_utterance_start - 1]]
                 ).strip()
                 if normalize_unicode:
                     text = unicodedata.normalize("NFKC", text)
@@ -439,7 +477,14 @@ class DataProcessor:
         """
         Convert a string in the format of "00:00:00,000" to milliseconds.
         """
-        time, miliseconds = s.split(",")
+        if "," in s:
+            time, miliseconds = s.split(",")
+        elif "." in s:
+            time, miliseconds = s.split(".")
+        else:
+            raise ValueError(
+                f"Invalid time format: {s}. Must be in the format of 00:00:00,000 or 00:00:00.000"
+            )
         hours, minutes, seconds = time.split(":")
         hours = int(hours)
         minutes = int(minutes)
