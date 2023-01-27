@@ -298,8 +298,8 @@ class DataProcessor:
                 end_time = DataProcessor.str_to_milliseconds(end_time)
 
                 # `next_utterance_start - 1` corresponds to an index number of the utterance and
-                # `next_utterance_start - 2` corresponds to a newline character, thus the text is included
-                # between [`utterance_start + 1`, `next_utterance_start - 2`).
+                # `next_utterance_start - 2` corresponds to a newline character, thus the text is
+                # included between [`utterance_start + 1`, `next_utterance_start - 2`).
                 text = " ".join(
                     [line.strip() for line in lines[utterance_start + 1 : next_utterance_start - 2]]
                 ).strip()
