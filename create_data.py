@@ -266,13 +266,25 @@ class DataProcessor:
         for audio_path in tqdm(audio_paths):
             speech_id = Path(audio_path).stem
             if (Path(self.transcript_dir) / f"{speech_id}.srt").exists():
-                utterances_for_speech = self.read_utterances_from_srt(
-                    Path(self.transcript_dir) / f"{speech_id}.srt", self.normalize_unicode
-                )
+                transcript_path = Path(self.transcript_dir) / f"{speech_id}.srt"
+                try:
+                    utterances_for_speech = self.read_utterances_from_srt(
+                        transcript_path, self.normalize_unicode
+                    )
+                except Exception as e:
+                    print(e)
+                    print(f"Skipping {transcript_path} because of an error in the transcript")
+                    continue
             elif (Path(self.transcript_dir) / f"{speech_id}.vtt").exists():
-                utterances_for_speech = self.read_utterances_from_vtt(
-                    Path(self.transcript_dir) / f"{speech_id}.vtt", self.normalize_unicode
-                )
+                transcript_path = Path(self.transcript_dir) / f"{speech_id}.vtt"
+                try:
+                    utterances_for_speech = self.read_utterances_from_vtt(
+                        transcript_path, self.normalize_unicode
+                    )
+                except Exception as e:
+                    print(e)
+                    print(f"Skipping {transcript_path} because of an error in the transcript")
+                    continue
             else:
                 raise FileNotFoundError(f"Transcript file not found for {speech_id}")
 
@@ -378,7 +390,7 @@ class DataProcessor:
                 segment_utterances.append(utterances[idx])
                 idx += 1
 
-            if not self._is_valid_utterances(segment_utterances):
+            if not self._is_valid_utterances(segment_utterances, segment_start):
                 tqdm.write(
                     f"Skipping {audio_path} ({format_timestamp(segment_start / 1000)}-"
                     f"{format_timestamp(segment_end / 1000)}) because it contains invalid "
@@ -446,18 +458,21 @@ class DataProcessor:
         torchaudio.save(segment_audio_path, segment_audio.unsqueeze(0), SAMPLE_RATE)
         return segment_audio_path
 
-    def _is_valid_utterances(self, utterances: List[Utterance]) -> bool:
+    def _is_valid_utterances(self, utterances: List[Utterance], segment_start: int) -> bool:
         if len(utterances) == 0:
             return True
 
-        for i in range(len(utterances) - 1):
-            if utterances[i].start > utterances[i].end:
+        for utterance in utterances:
+            # Check the utterances' start times are in the segment
+            if utterance.start < segment_start:
                 return False
-            if utterances[i].end > utterances[i + 1].start:
+            if utterance.start > utterance.end:
                 return False
 
-        if utterances[-1].start > utterances[-1].end:
-            return False
+        # Check the utterances do not overlap
+        for i in range(len(utterances) - 1):
+            if utterances[i].end > utterances[i + 1].start:
+                return False
 
         return True
 
