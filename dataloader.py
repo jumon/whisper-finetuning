@@ -81,7 +81,7 @@ class AudioDataset(Dataset):
 
         return tokens
 
-    def _get_next_partial_segment_start(self, tokens: List[int]) -> Optional[float]:
+    def _get_partial_segment_start(self, tokens: List[int]) -> Optional[float]:
         if (
             len(tokens) >= 2
             and tokens[-2] >= self.tokenizer.timestamp_begin
@@ -93,17 +93,17 @@ class AudioDataset(Dataset):
 
     def _get_text_tokens(self, text: str, no_timestamps: bool) -> Tuple[List[int], Optional[float]]:
         text_tokens = self._encode_text_with_timestamps(text)
-        next_partial_segment_start = self._get_next_partial_segment_start(text_tokens)
+        next_partial_segment_start = self._get_partial_segment_start(text_tokens)
         if no_timestamps:
             text_tokens = list(filter(lambda x: x < self.tokenizer.timestamp_begin, text_tokens))
 
         return text_tokens, next_partial_segment_start
 
     def _calculate_mel(
-        self, audio_path: str, next_partial_segment_start: Optional[float]
+        self, audio_path: str, next_partial_segment_start: Optional[float], no_timestamps: bool
     ) -> torch.Tensor:
         mel = log_mel_spectrogram(audio_path)
-        if next_partial_segment_start is not None:
+        if no_timestamps and next_partial_segment_start is not None:
             mel = mel[:, : int(next_partial_segment_start * self.num_frames_per_second)]
         mel = pad_or_trim(mel, N_FRAMES)
         if self.fp16:
@@ -133,7 +133,7 @@ class AudioDataset(Dataset):
             + [self.tokenizer.eot]
         )
 
-        mel = self._calculate_mel(record.audio_path, next_partial_segment_start)
+        mel = self._calculate_mel(record.audio_path, next_partial_segment_start, no_timestamps)
 
         return (
             mel,
