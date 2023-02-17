@@ -111,6 +111,25 @@ class AudioDataset(Dataset):
 
         return mel
 
+    def _construct_decoder_output(
+        self, prompt_tokens: List[int], special_tokens: List[int], text_tokens: List[int]
+    ) -> List[int]:
+        if len(prompt_tokens) == 0:
+            decoder_output = special_tokens[1:] + text_tokens + [self.tokenizer.eot]
+        else:
+            decoder_output = (
+                # Mask out the training loss for predicting the prompt tokens. We use "-100" as the
+                # default value for the `ignore_index` parameter in
+                # `torch.nn.functional.cross_entropy()`. However, we do not mask out the loss for
+                # predicting the sot token because our experiment indicates that the original
+                # Whisper model assigns a high probability to the sot token after prompt tokens.
+                [-100] * (len(prompt_tokens) - 1)
+                + special_tokens
+                + text_tokens
+                + [self.tokenizer.eot]
+            )
+        return decoder_output
+
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         record = self.records[index]
         no_timestamps = self.no_timestamps_training or torch.rand(1) < self.no_timestamps_rate
@@ -124,14 +143,7 @@ class AudioDataset(Dataset):
         if len(decoder_input) > self.model_n_text_ctx:
             raise ValueError(f"Input is too long: {record} (length: {len(decoder_input)})")
 
-        decoder_output = (
-            # Mask out the training loss for the prompt tokens. -100 is a default value for
-            # `ignore_index` in `torch.nn.functional.cross_entropy()`.
-            [-100] * len(prompt_tokens)
-            + special_tokens[1:]
-            + text_tokens
-            + [self.tokenizer.eot]
-        )
+        decoder_output = self._construct_decoder_output(prompt_tokens, special_tokens, text_tokens)
 
         mel = self._calculate_mel(record.audio_path, next_partial_segment_start, no_timestamps)
 
