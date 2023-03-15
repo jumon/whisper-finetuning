@@ -561,7 +561,7 @@ class DataProcessor:
 
     @staticmethod
     def write_records(records: List[Record], path: Union[str, Path]) -> None:
-        with open(path, "a") as f:
+        with open(path, "a", encoding="utf-8") as f:
             for record in records:
                 data = {
                     "audio_path": record.audio_path,
