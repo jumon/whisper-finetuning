@@ -242,7 +242,7 @@ class DataProcessor:
 
     def _process_without_timestamps(self) -> None:
         records = []
-        with open(self.data_file) as f:
+        with open(self.data_file, encoding="utf-8") as f:
             for line in f:
                 audio_path, text = line.strip().split("\t")
                 if self.normalize_unicode:
@@ -296,7 +296,7 @@ class DataProcessor:
         transcript_path: Union[str, Path], normalize_unicode: bool = False
     ) -> List[Utterance]:
         utterances = []
-        with open(transcript_path) as f:
+        with open(transcript_path, encoding="utf-8") as f:
             lines = f.readlines()
             timestamps_indices = [i for i, line in enumerate(lines) if " --> " in line]
             timestamps_indices.append(len(lines) + 1)  # a dummy index to make the loop below simple
@@ -331,7 +331,7 @@ class DataProcessor:
         transcript_path: Union[str, Path], normalize_unicode: bool = False
     ) -> List[Utterance]:
         utterances = []
-        with open(transcript_path) as f:
+        with open(transcript_path, encoding="utf-8") as f:
             lines = f.readlines()
             timestamps_indices = [i for i, line in enumerate(lines) if " --> " in line]
             timestamps_indices.append(len(lines) + 1)  # a dummy index to make the loop below simple
@@ -547,7 +547,7 @@ class DataProcessor:
     @staticmethod
     def read_records(path: Union[str, Path]) -> List[Record]:
         records = []
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 data = json.loads(line)
                 record = Record(
