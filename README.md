@@ -14,6 +14,7 @@ pip install -r requirements.txt
 
 # windows only
 pip install soundfile
+# if you want to use bitsandbytes in windows
 cp .\bitsandbytes_windows\*.dll .\venv\Lib\site-packages\bitsandbytes\
 cp .\bitsandbytes_windows\cextension.py .\venv\Lib\site-packages\bitsandbytes\cextension.py
 cp .\bitsandbytes_windows\main.py .\venv\Lib\site-packages\bitsandbytes\cuda_setup\main.py
@@ -41,6 +42,8 @@ You can finetune a model with the jsonl files generated in the previous step:
 ```
 python run_finetuning.py --train-json <path-to-train.json> --dev-json <path-to-dev.json> --model <model-name>
 ```
+You can use/add the flag `--use-adam-8bit` to use the Adam 8bit optimizer from bitsandbytes. This will reduce VRAM usage and allows to train using small multimodal model with 8GB of VRAM.
+
 For all available options, see `python run_finetuning.py --help`.
 
 ### 3. Transcribe audio files
