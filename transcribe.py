@@ -52,11 +52,6 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def save_srt(transcript: Iterator[dict], path: Union[str, Path]) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        write_srt(transcript, file=f)
-
-
 def main():
     args = get_parser().parse_args()
     Path(args.save_dir).mkdir(parents=True, exist_ok=True)
