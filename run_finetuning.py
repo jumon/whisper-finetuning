@@ -180,7 +180,7 @@ def set_seed(seed: int):
 
 
 def save_args(args: argparse.Namespace, path: str) -> None:
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(json.dumps(vars(args), indent=4, ensure_ascii=False))
 
 
