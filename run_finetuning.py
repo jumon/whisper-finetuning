@@ -115,6 +115,11 @@ def get_parser() -> argparse.ArgumentParser:
         default=42,
         help="Random seed for reproducibility",
     )
+    parser.add_argument(
+        "--use-adam-8bit",
+        action="store_true",
+        help="Use Adam 8bit optimizer for reduced VRAM usage.",
+    )
     return parser
 
 
@@ -263,7 +268,14 @@ def main():
         no_timestamps_rate=0.0,
         shuffle=False,
     )
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    if args.use_adam_8bit:
+        try:
+            import bitsandbytes as bnb
+        except ImportError:
+            raise ImportError("For using Adam 8bit optimizer you need to have bitsandbytes installed.")
+        optimizer = bnb.optim.Adam8bit(model.parameters(), lr=args.lr)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=args.train_steps
     )

@@ -6,10 +6,21 @@ This repository, however, provides scripts that allow you to fine-tune a Whisper
 
 ## Setup
 ```
+python -m venv venv
+.\venv\Scripts\activate
+
+pip install torch==1.12.1+cu116 torchaudio==0.12.1+cu116 torchvision==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 pip install -r requirements.txt
+
+# windows only
+pip install soundfile
+cp .\bitsandbytes_windows\*.dll .\venv\Lib\site-packages\bitsandbytes\
+cp .\bitsandbytes_windows\cextension.py .\venv\Lib\site-packages\bitsandbytes\cextension.py
+cp .\bitsandbytes_windows\main.py .\venv\Lib\site-packages\bitsandbytes\cuda_setup\main.py
 ```
 You may also need to install [ffmpeg](https://ffmpeg.org/) and [rust](https://www.rust-lang.org/) to run Whisper depending on your environment.
 See the [instructions](https://github.com/openai/whisper#setup) in the Whisper repository for more details if you encounter any errors.
+In Windows for now you also have to change the num_workers parameter in dataloader.py (almost at the end of the file) and set it to 0.
 
 ## Usage
 ### 1. Prepare your data
