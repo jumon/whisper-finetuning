@@ -54,8 +54,8 @@ class AudioDataset(Dataset):
         else:
             special_tokens = [
                 self.tokenizer.sot,
-                self.tokenizer.special_tokens.get(f"<|{language}|>"),
-                self.tokenizer.special_tokens.get("<|transcribe|>"),
+                self.tokenizer.special_tokens[f"<|{language}|>"],
+                self.tokenizer.special_tokens["<|transcribe|>"],
             ]
             if no_timestamps:
                 special_tokens.append(self.tokenizer.no_timestamps)
