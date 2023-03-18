@@ -53,7 +53,7 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def save_srt(transcript: Iterator[dict], path: Union[str, Path]) -> None:
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         write_srt(transcript, file=f)
 
 
