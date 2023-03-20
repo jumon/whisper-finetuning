@@ -59,10 +59,8 @@ def main():
     writer = get_writer("srt", args.save_dir)
 
     for audio_path in tqdm(list(Path(args.audio_dir).iterdir())):
-        speech_id = Path(audio_path).stem
         result = model.transcribe(task=args.task, audio=str(audio_path), language=args.language)
-        recognized_path = Path(args.save_dir) / f"{speech_id}.srt"
-        writer(result, recognized_path)
+        writer(result, str(audio_path))
 
 
 if __name__ == "__main__":
