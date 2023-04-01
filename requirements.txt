@@ -1,3 +1,5 @@
-openai-whisper
-evaluate
-jiwer
+openai-whisper==20230314
+evaluate==0.4.0
+jiwer==3.0.0
+transformers==4.26.0
+bitsandbytes==0.35.0
