@@ -7,23 +7,22 @@ This repository, however, provides scripts that allow you to fine-tune a Whisper
 ## Setup
 ```
 python -m venv venv
-.\venv\Scripts\activate
-
-pip install torch==1.12.1+cu116 torchaudio==0.12.1+cu116 torchvision==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+source venv/bin/activate
 pip install -r requirements.txt
 ```
-You may also need to install [ffmpeg](https://ffmpeg.org/) and [rust](https://www.rust-lang.org/) to run Whisper depending on your environment.
+To install pytorch, you may need to follow the instructions [here](https://pytorch.org/get-started/locally/) depending on your environment.
+You may also need to install [ffmpeg](https://ffmpeg.org/) and [rust](https://www.rust-lang.org/) to run Whisper.
 See the [instructions](https://github.com/openai/whisper#setup) in the Whisper repository for more details if you encounter any errors.
 
 ### Windows 
-You also will need to install soundfile python package.
+You will need to install the `soundfile` python package.
 ```
 pip install soundfile
 ```
-In Windows for now you also have to change the **num_workers** parameter in dataloader.py (almost at the end of the file) and set it to 0.
+On Windows, you also have to change the `num_workers` parameter in `dataloader.py` (almost at the end of the file) by setting it to 0.
 
-For using Adam 8bit optimizer with bitsandbytes package you will need to download prebuilt built binaries from other repo, since by default it is not supported.
-You can grab the .dll from [here](https://github.com/DeXtmL/bitsandbytes-win-prebuilt) or more easily download [this folder](https://github.com/bmaltais/kohya_ss/tree/master/bitsandbytes_windows) with the .dll and .py to patch and copy them like so:
+For using the Adam 8bit optimizer with the `bitsandbytes` package, you will need to download pre-built binaries from another repo, since by default it is not supported.
+You can grab the .dll from [here](https://github.com/DeXtmL/bitsandbytes-win-prebuilt) or more easily download [this folder](https://github.com/bmaltais/kohya_ss/tree/master/bitsandbytes_windows) with the .dll and .py to patch and copy them using the following commands:
 ```
 cp .\bitsandbytes_windows\*.dll .\venv\Lib\site-packages\bitsandbytes\
 cp .\bitsandbytes_windows\cextension.py .\venv\Lib\site-packages\bitsandbytes\cextension.py
@@ -49,7 +48,7 @@ You can finetune a model with the jsonl files generated in the previous step:
 ```
 python run_finetuning.py --train-json <path-to-train.json> --dev-json <path-to-dev.json> --model <model-name>
 ```
-You can use/add the flag `--use-adam-8bit` to use the Adam 8bit optimizer from bitsandbytes. This will reduce VRAM usage and allows to train using small multimodal model with 8GB of VRAM.
+You can use the `--use-adam-8bit` flag to utilize the Adam 8bit optimizer from `bitsandbytes`. This will reduce VRAM usage and allows to train using small multimodal models with 8GB of VRAM.
 
 For all available options, see `python run_finetuning.py --help`.
 
