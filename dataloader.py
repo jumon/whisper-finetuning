@@ -172,6 +172,7 @@ def get_dataloader(
     prompt_use_rate: float = 0.5,
     no_timestamps_rate: float = 0.5,
     shuffle: bool = True,
+    workers = 4,
 ) -> DataLoader:
     records = DataProcessor.read_records(json)
     dataset = AudioDataset(
@@ -187,7 +188,7 @@ def get_dataloader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
-        num_workers=4,
+        num_workers=workers,
         pin_memory=True,
         collate_fn=collate_fn,
     )

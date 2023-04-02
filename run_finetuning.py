@@ -120,6 +120,11 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use Adam 8bit optimizer for reduced VRAM usage.",
     )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=4,
+        help="Number of workers for the dataloader")
     return parser
 
 
@@ -255,6 +260,7 @@ def main():
         prompt_use_rate=args.prompt_use_rate,
         no_timestamps_rate=args.no_timestamps_rate,
         shuffle=True,
+        workers=args.num_workers
     )
     dev_loader = get_dataloader(
         json=args.dev_json,
@@ -267,6 +273,7 @@ def main():
         prompt_use_rate=1.0,
         no_timestamps_rate=0.0,
         shuffle=False,
+        workers=args.num_workers,
     )
     if args.use_adam_8bit:
         try:
