@@ -21,4 +21,4 @@ module load ffmpeg/4.4
 # Activate the virtual environment -> link to your own before starting 
 source /zhome/ad/4/137151/venv_new_torch/bin/activate
 
-python run_finetuning.py --train-json=datasets/commonvoice_train --dev-json=datasets/commonvoice_dev --batch-size=24 --no-timestamps-training --model=small --num-workers=12 --train-steps=2500 
+python run_finetuning.py --train-folder=datasets/train/ --dev-folder=datasets/dev/ --batch-size=4 --no-timestamps-training --model=large --num-workers=12 --train-steps=500 --use-adam-8bit --eval-steps=10

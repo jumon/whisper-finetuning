@@ -1,6 +1,8 @@
 import argparse
 import copy
+import glob
 import json
+import os
 import random
 from dataclasses import asdict
 from pathlib import Path
@@ -23,16 +25,16 @@ def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Fine-tune a Whisper model for ASR")
     # Dataloader-related arguments
     parser.add_argument(
-        "--train-json",
+        "--train-folder",
         type=str,
         required=True,
-        help="Path to a json file containing training data",
+        help="folder, will look for all json files in the folder",
     )
     parser.add_argument(
-        "--dev-json",
+        "--dev-folder",
         type=str,
         required=True,
-        help="Path to a json file containing development data",
+        help="foler, will look for all json files in the folder",
     )
     parser.add_argument("--batch-size", type=int, default=1, help="Batch size for training")
     parser.add_argument("--dev-batch-size", type=int, default=16, help="Batch size for validation")
@@ -223,7 +225,6 @@ def main_loop(
             args.max_grad_norm,
         )
         pbar.set_postfix({"loss": train_loss})
-
         if step % args.eval_steps == 0:
             eval_loss = evaluate(model, dev_loader)
             tqdm.write(f"Step {step}: validation loss={eval_loss}")
@@ -240,7 +241,7 @@ def main_loop(
 def main():
     args = get_parser().parse_args()
     set_seed(args.seed)
-    torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.benchmark = False
     Path(args.save_dir).mkdir(parents=True, exist_ok=True)
     save_args(args, f"{args.save_dir}/args.json")
 
@@ -250,8 +251,16 @@ def main():
     max_prompt_length = model.dims.n_text_ctx // 2 - 1
 
     fp16 = args.device == "cuda"
+    # get all documents from --train-folder
+    train_json = []
+    if args.train_folder is not None:
+        train_json = glob.glob(os.path.join(args.train_folder, "*"))
+
+    if train_json == []:
+        print("No training files found in --train-folder")
+        exit(1)
     train_loader = get_dataloader(
-        json=args.train_json,
+        json=train_json,
         tokenizer=tokenizer,
         batch_size=args.batch_size,
         fp16=fp16,
@@ -262,8 +271,18 @@ def main():
         shuffle=True,
         workers=args.num_workers
     )
+
+
+    dev_json = []
+    if args.train_folder is not None:
+        dev_json = glob.glob(os.path.join(args.dev_folder, "*"))
+
+    if dev_json == []:
+        print("No training files found in --train-folder")
+        exit(1)
+    print("Build train loader done, with {} batches".format(len(train_loader)))
     dev_loader = get_dataloader(
-        json=args.dev_json,
+        json=dev_json,
         tokenizer=tokenizer,
         batch_size=args.dev_batch_size,
         fp16=fp16,

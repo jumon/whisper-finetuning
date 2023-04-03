@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -28,7 +28,6 @@ class AudioDataset(Dataset):
         self.max_prompt_length = max_prompt_length
         self.prompt_use_rate = prompt_use_rate
         self.no_timestamps_rate = no_timestamps_rate
-
         self.num_frames_per_second = N_FRAMES / CHUNK_LENGTH
         # timestamps tokens are from <|0.00|> to <|30.00|> with a step of 0.02
         self.timestamp_pattern = re.compile(r"(<\|[123]?[0-9]\.[0-9][0-9]\|>)")
@@ -100,7 +99,7 @@ class AudioDataset(Dataset):
         return text_tokens, next_partial_segment_start
 
     def _calculate_mel(
-        self, audio_path: str, next_partial_segment_start: Optional[float], no_timestamps: bool
+        self, audio_path: Union[str, List[float]], next_partial_segment_start: Optional[float], no_timestamps: bool
     ) -> torch.Tensor:
         mel = log_mel_spectrogram(audio_path)
         if no_timestamps and next_partial_segment_start is not None:
@@ -163,7 +162,7 @@ def collate_fn(data):
 
 
 def get_dataloader(
-    json: str,
+    json: Union[str, List[str]],
     tokenizer: Tokenizer,
     batch_size: int = 1,
     fp16: bool = True,
@@ -174,7 +173,12 @@ def get_dataloader(
     shuffle: bool = True,
     workers = 4,
 ) -> DataLoader:
-    records = DataProcessor.read_records(json)
+    records = []
+    if isinstance(json, list):
+        for j in json:
+            records.extend(DataProcessor.read_records(j))
+    else:
+        records = DataProcessor.read_records(json)
     dataset = AudioDataset(
         records,
         tokenizer,

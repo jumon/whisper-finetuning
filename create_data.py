@@ -154,8 +154,7 @@ class Record:
     A single training instance for Whisper.
     `text` can include timestamps in the format of <|0.00|>.
     """
-
-    audio_path: str
+    audio_path: Union[str, List[float]]
     text: str  # text including timestamps
     language: str = "en"
     prompt: str = ""  # previous text including timestamps
