@@ -75,7 +75,7 @@ def get_parser() -> argparse.ArgumentParser:
         help="name of the Whisper model to use",
     )
     parser.add_argument("--train-only-decoder", action="store_true", help="train only the decoder")
-    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate for training")
+    parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate for training")
     parser.add_argument(
         "--accum-grad-steps",
         type=int,
