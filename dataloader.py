@@ -196,3 +196,29 @@ def get_dataloader(
         pin_memory=True,
         collate_fn=collate_fn,
     )
+
+def get_dataset(
+    json: Union[str, List[str]],
+    tokenizer: Tokenizer,
+    fp16: bool = True,
+    no_timestamps_training: bool = False,
+    max_prompt_length: int = 223,
+    prompt_use_rate: float = 0.5,
+    no_timestamps_rate: float = 0.5,
+) -> AudioDataset:
+    records = []
+    if isinstance(json, list):
+        for j in json:
+            records.extend(DataProcessor.read_records(j))
+    else:
+        records = DataProcessor.read_records(json)
+    dataset = AudioDataset(
+        records,
+        tokenizer,
+        fp16=fp16,
+        no_timestamps_training=no_timestamps_training,
+        max_prompt_length=max_prompt_length,
+        prompt_use_rate=prompt_use_rate,
+        no_timestamps_rate=no_timestamps_rate,
+    )
+    return dataset    
