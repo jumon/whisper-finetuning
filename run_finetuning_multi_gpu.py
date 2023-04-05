@@ -180,17 +180,17 @@ class Trainer:
 
             if self.train_only_decoder:
                 with torch.no_grad():
-                    audio_features = self.model.embed_audio(x)
+                    audio_features = self.model.module.embed_audio(x)
             else:
-                audio_features = self.model.embed_audio(x)
-            logits = self.model.logits(y_in, audio_features=audio_features)
+                audio_features = self.model.module.embed_audio(x)
+            logits = self.model.module.logits(y_in, audio_features=audio_features)
             loss = F.cross_entropy(logits.transpose(1, 2), y_out)
 
-            loss = loss / self.accum_grad_steps
+            loss = loss / self.grad_step
             loss.backward()
             total_loss += loss.item()
 
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(self.model.module.parameters(), self.max_grad_norm)
         self.optimizer.step()
         self.scheduler.step()
         self.optimizer.zero_grad()
@@ -215,7 +215,7 @@ class Trainer:
     def train(self):
         min_loss = self._evaluate()
         print(f"Initial loss: {min_loss}")
-        for step in range(self.train_steps):
+        for step in range(range(1, args.train_steps + 1)):
             start = time.time()
             train_loss = self._train_step()
             end = time.time()
