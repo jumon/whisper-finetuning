@@ -156,7 +156,7 @@ class Trainer:
                 scheduler: torch.optim.lr_scheduler._LRScheduler,
                 gpu_id: int,
                 args)-> None:
-        self.model = model.to(gpu_id)
+        self.model = model.to(f'cuda:{gpu_id}')
         self.train_data = train_data
         self.dev_data = dev_data
         self.optimizer = optimizer
@@ -215,7 +215,7 @@ class Trainer:
     def train(self):
         min_loss = self._evaluate()
         print(f"Initial loss: {min_loss}")
-        for step in range(range(1, args.train_steps + 1)):
+        for step in range(1, self.train_steps + 1):
             start = time.time()
             train_loss = self._train_step()
             end = time.time()
@@ -309,14 +309,14 @@ def ddp_setup(rank, world_size):
     """
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "12355"
-    init_process_group(backend="nccl", rank=rank, world_size=world_size)
+    init_process_group(backend="nccl", rank=rank, world_size=world_size) # Options NCCl, Gloo, MPI
 
 def load_train_objs(args):
     tokenizer = get_tokenizer(multilingual=".en" not in args.model, task="transcribe")
     # DDP doesnt support sparse tensors. Newest version of whisper is saving sparse vectors to reister_buffers
     # So we need to load the model and then load it as a whsiper_no_sparse model
-    model_with_sparse = whisper.load_model(args.model)
-    model = Whisper_no_sparse(model_with_sparse.dims)
+    model_with_sparse = whisper.load_model(args.model, device='cpu')
+    model = Whisper_no_sparse(model_with_sparse.dims).to('cpu')
     model.load_state_dict(model_with_sparse.state_dict())
     return tokenizer, model
 
