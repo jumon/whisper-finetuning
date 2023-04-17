@@ -5,8 +5,6 @@ import argparse
 from create_data import Record, DataProcessor
 from whisper.tokenizer import get_tokenizer
 
-
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", type=str, default="/work3/s212373/common_voice_11")
@@ -35,6 +33,7 @@ def process_dataset(dataset : pd.DataFrame, tokenizer, args):
             continue
         record = Record(audio_path=audio_path, text=text, language=args.language)
         records.append(record)
+    print(f"Saving {len(records)} records to {args.output}")
     DataProcessor.write_records(records, args.output)
 
 

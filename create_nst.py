@@ -27,6 +27,7 @@ def main(args):
     if args.split == "train":
         df = pd.read_csv(args.path + "NST_dk_clean.csv", sep=",", low_memory=False)
         path = args.path + "dk/"
+        file_names = df["filename_both_channels"]
     elif args.split == "test":
         df = pd.read_csv(args.path + "supplement_dk_clean.csv", sep=",", low_memory=False)
         path = args.path + "supplement_dk/testdata/audio/"
@@ -35,7 +36,6 @@ def main(args):
         raise ValueError("split must be either train or test")
     
     print(f"Processing {args.split} data")
-    file_names = df["filename_channel_1"]
     text_list = df["text"]
     tokenizer = get_tokenizer(multilingual=(args.tokenizer_type == "multilingual"))
     print("processing records")

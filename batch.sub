@@ -1,8 +1,8 @@
 #!/bin/sh
 #BSUB -q gpua100
-#BSUB -J WhisperTranscript
-#BSUB -n 12
-#BSUB -gpu "num=1:mode=exclusive_process"
+#BSUB -J train
+#BSUB -n 16
+#BSUB -gpu "num=2:mode=exclusive_process"
 #BSUB -W 24:00
 #BSUB -R "span[hosts=1]"
 #BSUB -R "rusage[mem=8GB]"
@@ -16,9 +16,11 @@ nvidia-smi
 #Load the necessary modules
 module load cuda/11.7
 module load python3/3.9.11
-module load ffmpeg/4.4
+module load ffmpeg/5.0.1
 
 # Activate the virtual environment -> link to your own before starting 
 source /zhome/ad/4/137151/venv_new_torch/bin/activate
 
-python run_finetuning.py --train-folder=datasets/train/ --dev-folder=datasets/dev/ --batch-size=4 --no-timestamps-training --model=large --num-workers=12 --train-steps=500 --use-adam-8bit --eval-steps=10
+# export CUDA_VISIBLE_DEVICES=0,1
+
+python run_finetuning_multi_gpu.py --train-folder=datasets/train/ --dev-folder=datasets/dev/ --batch-size=4 --no-timestamps-training --model=large --num-workers=1 --train-steps=500 --eval-steps=25 --accum-grad-steps=256
