@@ -46,12 +46,6 @@ class AudioDataset(Dataset):
 
         return prompt_tokens
 
-    def _get_single_token_id(self, text) -> int:
-        tokens = self.tokenizer.encode(text)
-        if not len(tokens) == 1:
-            raise Exception(f"{text} is not encoded as a single token")
-        return tokens[0]
-    
     def _get_special_tokens(
         self, is_text_empty: bool, language: str, no_timestamps: bool
     ) -> List[int]:
@@ -60,8 +54,8 @@ class AudioDataset(Dataset):
         else:
             special_tokens = [
                 self.tokenizer.sot,
-                self._get_single_token_id(f"<|{language}|>"),
-                self._get_single_token_id("<|transcribe|>"),
+                self.tokenizer.special_tokens[f"<|{language}|>"],
+                self.tokenizer.special_tokens["<|transcribe|>"],
             ]
             if no_timestamps:
                 special_tokens.append(self.tokenizer.no_timestamps)
