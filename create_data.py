@@ -29,7 +29,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--without-timestamps",
         action="store_false",
-        dest="with-timestamps",
+        dest="with_timestamps",
         help=(
             "Read a text file containing audio filenames and transcriptions to create a jsonl file "
             "without timestamps and prompts. This will be used for fine-tuning a Whisper model "
@@ -500,7 +500,18 @@ class DataProcessor:
             raise ValueError(
                 f"Invalid time format: {s}. Must be in the format of 00:00:00,000 or 00:00:00.000"
             )
-        hours, minutes, seconds = time.split(":")
+        # WebVTT timestamps may omit the hours field when it is zero (e.g. "00:05.000"),
+        # which is how Whisper's own VTT writer formats segments shorter than one hour.
+        time_parts = time.split(":")
+        if len(time_parts) == 3:
+            hours, minutes, seconds = time_parts
+        elif len(time_parts) == 2:
+            hours, (minutes, seconds) = "0", time_parts
+        else:
+            raise ValueError(
+                f"Invalid time format: {s}. Must be in the format of 00:00:00,000, "
+                "00:00:00.000 or 00:00.000"
+            )
         hours = int(hours)
         minutes = int(minutes)
         seconds = int(seconds)
