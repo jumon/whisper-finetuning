@@ -29,7 +29,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--without-timestamps",
         action="store_false",
-        dest="with-timestamps",
+        dest="with_timestamps",
         help=(
             "Read a text file containing audio filenames and transcriptions to create a jsonl file "
             "without timestamps and prompts. This will be used for fine-tuning a Whisper model "
@@ -299,7 +299,10 @@ class DataProcessor:
         with open(transcript_path, encoding="utf-8") as f:
             lines = f.readlines()
             timestamps_indices = [i for i, line in enumerate(lines) if " --> " in line]
-            timestamps_indices.append(len(lines) + 1)  # a dummy index to make the loop below simple
+            # a dummy index to make the loop below simple; +2 so that the text of the last
+            # utterance spans until the end of the file even when the file does not end with
+            # a blank line
+            timestamps_indices.append(len(lines) + 2)
 
             for i in range(len(timestamps_indices) - 1):
                 utterance_start = timestamps_indices[i]
@@ -377,6 +380,9 @@ class DataProcessor:
                 utterances[idx].start < segment_end
                 and utterances[idx].start + DURATION < utterances[idx].end
             ):
+                # The skipped utterance breaks the continuity of the transcript, so the buffered
+                # prompt must not be used for the following segments
+                prompt_buffer.clear()
                 segment_start = utterances[idx].end
                 segment_end = segment_start + DURATION
                 idx += 1
@@ -490,7 +496,8 @@ class DataProcessor:
     @staticmethod
     def str_to_milliseconds(s: str) -> int:
         """
-        Convert a string in the format of "00:00:00,000" to milliseconds.
+        Convert a string in the format of "00:00:00,000" (or "00:00:00.000") to milliseconds.
+        The hours part may be omitted (e.g. "00:00.000"), as allowed in the WebVTT format.
         """
         if "," in s:
             time, miliseconds = s.split(",")
@@ -500,7 +507,16 @@ class DataProcessor:
             raise ValueError(
                 f"Invalid time format: {s}. Must be in the format of 00:00:00,000 or 00:00:00.000"
             )
-        hours, minutes, seconds = time.split(":")
+        time_parts = time.split(":")
+        if len(time_parts) == 3:
+            hours, minutes, seconds = time_parts
+        elif len(time_parts) == 2:
+            hours = "0"
+            minutes, seconds = time_parts
+        else:
+            raise ValueError(
+                f"Invalid time format: {s}. Must be in the format of 00:00:00,000 or 00:00.000"
+            )
         hours = int(hours)
         minutes = int(minutes)
         seconds = int(seconds)

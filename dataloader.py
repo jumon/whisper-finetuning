@@ -83,10 +83,12 @@ class AudioDataset(Dataset):
 
     def _get_partial_segment_start(self, tokens: List[int]) -> Optional[float]:
         if (
-            len(tokens) >= 2
-            and tokens[-2] >= self.tokenizer.timestamp_begin
+            len(tokens) >= 1
             and tokens[-1] >= self.tokenizer.timestamp_begin
+            and (len(tokens) == 1 or tokens[-2] >= self.tokenizer.timestamp_begin)
         ):  # if the last token is a start time token
+            # A start time token is either preceded by an end time token or is the only token
+            # (i.e., the segment contains nothing but the beginning of a partial utterance)
             return (tokens[-1] - self.tokenizer.timestamp_begin) * 0.02
         else:
             return None

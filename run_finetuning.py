@@ -4,7 +4,7 @@ import json
 import random
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterator, Tuple
+from typing import Iterator
 
 import numpy as np
 import torch
@@ -131,7 +131,7 @@ def train_step(
     accum_grad_steps: int,
     train_only_decoder: bool,
     max_grad_norm: float,
-) -> Tuple[float, Iterator]:
+) -> float:
     model.train()
     total_loss = 0
     for _ in range(accum_grad_steps):
